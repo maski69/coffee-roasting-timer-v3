@@ -28,6 +28,20 @@ h3 {
   margin-top: 0px;
 }
 
+.btn-export {
+	background-color: #111;
+	border-color: #111;
+	color: #fff;
+}
+
+.btn-export:hover,
+.btn-export:focus,
+.btn-export:active {
+	background-color: #000;
+	border-color: #000;
+	color: #fff;
+}
+
 #save-status {
 	min-height: 20px;
 	margin-bottom: 0px;
