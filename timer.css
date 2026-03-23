@@ -27,3 +27,8 @@ h1 {
 h3 {
   margin-top: 0px;
 }
+
+#save-status {
+	min-height: 20px;
+	margin-bottom: 0px;
+}

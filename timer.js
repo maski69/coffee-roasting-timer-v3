@@ -11,6 +11,7 @@ window.onload=function() {
   var yellowTime = 0;
   var firstCrackTime = 0;
   var dropTime = 0;
+  var roastStorageKey = "coffeeRoastingTimer.history.v1";
 
   function yellow() {
     if (start != 0 && timerRunning == 1) {
@@ -43,6 +44,9 @@ window.onload=function() {
 
   function finalizeRoast(finalTime) {
     dropTime = finalTime;
+
+    var roastDateLabel = new moment(dropTime).format('MMM Do YYYY, h:mm:ss a');
+    $("#date-timestamp").text("Date: " + roastDateLabel);
 
     if (yellowTime == 0 && startTime) {
       yellowTime = dropTime;
@@ -77,6 +81,9 @@ window.onload=function() {
     if (yellowInterval != 0) {
       clearInterval(yellowInterval);
     }
+
+    saveRoastRecord();
+    setSaveStatus("Batch saved for export at " + new moment(dropTime).format('h:mm:ss a') + ".");
   }
   
   $("#start-button").click(function() {
@@ -132,11 +139,13 @@ window.onload=function() {
       $("#high").text("25.0%: ");
       $("#weight-loss").text("Weight Loss: ");
       $("#date-timestamp").text("Date: ");
+      setSaveStatus("");
     } else {
       timerRunning = 1;
       $(this).text("Stop");
       $(this).removeClass("btn-primary");
       $(this).addClass("btn-danger");
+      setSaveStatus("");
   
       interval = setInterval(function() {
         $(".jumbotron h1#timer").text(timeToString(new Date().getTime() - start));
@@ -216,6 +225,10 @@ window.onload=function() {
     $("#date-timestamp").text("Date: " + new moment().format('MMM Do YYYY, h:mm:ss a'));
   });
 
+  $("#export-button").click(function() {
+    exportHistoryCsv();
+  });
+
   function calcWeightLoss(greenWeight, roastWeight) {
     var weightLoss = 0;
 
@@ -224,6 +237,10 @@ window.onload=function() {
     }
 
     return weightLoss.toFixed(2);
+  }
+
+  function setSaveStatus(message) {
+    $("#save-status").text(message || "");
   }
 
   function updatePhases() {
@@ -255,6 +272,142 @@ window.onload=function() {
 
       $("#development").text("Development (Time): " + formatTime(development));
     }
+  }
+
+  function saveRoastRecord() {
+    if (!startTime || !dropTime) {
+      return;
+    }
+
+    var totalSeconds = (dropTime - startTime) / 1000;
+    var dryingSeconds = yellowTime ? (yellowTime - startTime) / 1000 : null;
+    var maillardEndTime = firstCrackTime || dropTime;
+    var maillardSeconds = yellowTime ? (maillardEndTime - yellowTime) / 1000 : null;
+    var developmentSeconds = firstCrackTime ? (dropTime - firstCrackTime) / 1000 : null;
+    var bean = $("#bean").val() || "";
+    var greenWeight = $("#green-weight").val() || "";
+    var roastWeight = $("#roast-weight").val() || "";
+    var weightLoss = "";
+
+    if (greenWeight !== "" && roastWeight !== "") {
+      weightLoss = calcWeightLoss(greenWeight, roastWeight);
+      $("#weight-loss").text("Weight Loss: " + weightLoss + "%");
+    }
+
+    var record = {
+      date: new moment(dropTime).format('YYYY-MM-DD HH:mm:ss'),
+      bean: bean,
+      totalTime: formatTime(totalSeconds),
+      yellowTime: yellowTime ? timeToString(yellowTime - start) : "",
+      firstCrackTime: firstCrackTime ? timeToString(firstCrackTime - start) : "",
+      dropTime: timeToString(dropTime - start),
+      dryingTime: dryingSeconds == null ? "" : formatTime(dryingSeconds),
+      dryingPercent: dryingSeconds == null || totalSeconds <= 0 ? "" : (dryingSeconds / totalSeconds * 100).toFixed(1),
+      maillardTime: maillardSeconds == null ? "" : formatTime(maillardSeconds),
+      maillardPercent: maillardSeconds == null || totalSeconds <= 0 ? "" : (maillardSeconds / totalSeconds * 100).toFixed(1),
+      developmentTime: developmentSeconds == null ? "" : formatTime(developmentSeconds),
+      developmentPercent: developmentSeconds == null || totalSeconds <= 0 ? "" : (developmentSeconds / totalSeconds * 100).toFixed(2),
+      greenWeight: greenWeight,
+      roastWeight: roastWeight,
+      weightLossPercent: weightLoss
+    };
+
+    var history = getRoastHistory();
+    history.push(record);
+    localStorage.setItem(roastStorageKey, JSON.stringify(history));
+  }
+
+  function getRoastHistory() {
+    var rawHistory = localStorage.getItem(roastStorageKey);
+
+    if (!rawHistory) {
+      return [];
+    }
+
+    try {
+      var parsed = JSON.parse(rawHistory);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function escapeCsvValue(value) {
+    var safeValue = value;
+
+    if (safeValue === null || safeValue === undefined) {
+      safeValue = "";
+    }
+
+    safeValue = String(safeValue).replace(/"/g, '""');
+
+    if (safeValue.indexOf(",") !== -1 || safeValue.indexOf("\n") !== -1 || safeValue.indexOf("\r") !== -1 || safeValue.indexOf('"') !== -1) {
+      return '"' + safeValue + '"';
+    }
+
+    return safeValue;
+  }
+
+  function exportHistoryCsv() {
+    var history = getRoastHistory();
+
+    if (history.length === 0) {
+      alert("No roast history yet. Complete a roast and press Drop or Stop to save it.");
+      return;
+    }
+
+    var headers = [
+      "Date",
+      "Bean",
+      "Total Time",
+      "Yellow Time",
+      "First Crack Time",
+      "Drop Time",
+      "Drying Time",
+      "Drying %",
+      "Maillard Time",
+      "Maillard %",
+      "Development Time",
+      "Development %",
+      "Green Weight",
+      "Roast Weight",
+      "Weight Loss %"
+    ];
+
+    var lines = [headers.join(",")];
+
+    for (var i = 0; i < history.length; i++) {
+      var row = history[i];
+      lines.push([
+        row.date,
+        row.bean,
+        row.totalTime,
+        row.yellowTime,
+        row.firstCrackTime,
+        row.dropTime,
+        row.dryingTime,
+        row.dryingPercent,
+        row.maillardTime,
+        row.maillardPercent,
+        row.developmentTime,
+        row.developmentPercent,
+        row.greenWeight,
+        row.roastWeight,
+        row.weightLossPercent
+      ].map(escapeCsvValue).join(","));
+    }
+
+    var csvContent = "\ufeff" + lines.join("\r\n");
+    var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    var filename = "coffee-roasts-" + new moment().format("YYYYMMDD-HHmmss") + ".csv";
+    var link = document.createElement("a");
+
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   }
 
   function formatTime(seconds) {
