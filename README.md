@@ -1,5 +1,5 @@
 # coffeer-oasting-timer-v3
-Coffee Roasting Timer - "Easily time your roast and track your development time with standard targets."
+Coffee Roasting Timer v3.1 - "Easily time your roast and track your development time with standard targets."
 My thanks to the original developer coffeeroastingtimer.
 The app has some additions that I found necessary to my roasting. I hope people find them useful as well.
 
