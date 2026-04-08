@@ -11,7 +11,8 @@ window.onload=function() {
   var yellowTime = 0;
   var firstCrackTime = 0;
   var dropTime = 0;
-  var roastStorageKey = "coffeeRoastingTimer.history.v1";
+  var roastStorageKey = "coffeeRoastingTimer.pendingExport.v2";
+  var legacyRoastStorageKey = "coffeeRoastingTimer.history.v1";
 
   function yellow() {
     if (start != 0 && timerRunning == 1) {
@@ -312,13 +313,16 @@ window.onload=function() {
       weightLossPercent: weightLoss
     };
 
-    var history = getRoastHistory();
-    history.push(record);
-    localStorage.setItem(roastStorageKey, JSON.stringify(history));
+    localStorage.removeItem(legacyRoastStorageKey);
+    localStorage.setItem(roastStorageKey, JSON.stringify([record]));
   }
 
   function getRoastHistory() {
     var rawHistory = localStorage.getItem(roastStorageKey);
+
+    if (!rawHistory) {
+      rawHistory = localStorage.getItem(legacyRoastStorageKey);
+    }
 
     if (!rawHistory) {
       return [];
@@ -326,10 +330,19 @@ window.onload=function() {
 
     try {
       var parsed = JSON.parse(rawHistory);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return [];
+      }
+
+      return [parsed[parsed.length - 1]];
     } catch (e) {
       return [];
     }
+  }
+
+  function clearRoastHistory() {
+    localStorage.removeItem(roastStorageKey);
+    localStorage.removeItem(legacyRoastStorageKey);
   }
 
   function escapeCsvValue(value) {
@@ -350,6 +363,7 @@ window.onload=function() {
 
   function exportHistoryCsv() {
     var history = getRoastHistory();
+    var exportCount = history.length;
 
     if (history.length === 0) {
       alert("No roast history yet. Complete a roast and press Drop or Stop to save it.");
@@ -408,6 +422,8 @@ window.onload=function() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
+    clearRoastHistory();
+    setSaveStatus(exportCount + " batch" + (exportCount === 1 ? "" : "es") + " exported to " + filename + ".");
   }
 
   function formatTime(seconds) {
